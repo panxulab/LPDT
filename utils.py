@@ -313,12 +313,12 @@ def get_prompt(prompt_trajectories, info, variant):
                 # traj = prompt_trajectories[i]
             # Try different segment method
             if variant["segment"] == "start":
-                indices = np.arange(max_len)  # 从轨迹开头取 max_len 个连续点
+                indices = np.arange(max_len)  
             elif variant["segment"] == "end":
-                indices = np.arange(traj['rewards'].shape[0] - max_len, traj['rewards'].shape[0])  # 从轨迹末端取 max_len 个连续点
+                indices = np.arange(traj['rewards'].shape[0] - max_len, traj['rewards'].shape[0])  
             elif variant["segment"] == "random":
-                start_idx = np.random.randint(0, traj['rewards'].shape[0] - max_len + 1)  # 随机选取起始点
-                indices = np.arange(start_idx, start_idx + max_len)  # 构造从起始点开始的连续索引
+                start_idx = np.random.randint(0, traj['rewards'].shape[0] - max_len + 1)  
+                indices = np.arange(start_idx, start_idx + max_len)  
             else:
                 raise ValueError("Invalid segment option. Choose from 'start', 'end', or 'random'.")
                 

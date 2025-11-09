@@ -18,9 +18,11 @@ from decision_transformer.evaluation.evaluate_episodes import (
     evaluate_episode_rtg,
 )
 from decision_transformer.models.decision_transformer import DecisionTransformer
+from decision_transformer.models.reinformer import Reinformer
 from decision_transformer.models.mlp_bc import MLPBCModel
 from decision_transformer.training.act_trainer import ActTrainer
 from decision_transformer.training.seq_trainer import SequenceTrainer
+from decision_transformer.training.rein_seq_trainer import ReinSequenceTrainer
 from utils import get_optimizer, process_info, process_total_data_mean, load_data, get_env_list, \
     get_prompt_batch, get_prompt, get_batch, get_batch_finetune, eval_episodes
 
@@ -236,7 +238,71 @@ def experiment(
                         param.requires_grad = True
         else:
             print("fintune all.")
-            
+    elif model_type == "reinformer":
+        model = Reinformer(
+            args=variant,
+            state_dim=state_dim,
+            act_dim=act_dim,
+            hidden_size=variant["embed_dim"],
+            max_length=K,
+            max_ep_len=1000,
+            num_class=variant["num_class"],
+            classifier=variant["classifier"],
+            infoNCE=variant["infoNCE"],
+            reconstruction=variant["reconstruction"],
+        )
+
+        if variant["adapt_mode"]:
+            if not variant["lora"]:
+                for param in model.parameters():
+                    param.requires_grad = False
+            else:
+                print("adapt lora.")
+                lora.mark_only_lora_as_trainable(model, bias='lora_only', depreciate_lora_rank=True)
+            if variant["adapt_wte"]:
+                print("adapt wte.")
+                for param in model.transformer.wte.parameters():
+                    param.requires_grad = True
+            if variant["adapt_wpe"]:
+                print("adapt wpe.")
+                for param in model.transformer.wpe.parameters():
+                    param.requires_grad = True
+            if variant["adapt_embed"]:
+                print("adapt embeddings.")
+                for name, param in model.named_parameters():
+                    if ("embed" in name or "predict" in name):
+                        param.requires_grad = True
+            if variant["adapt_ln"]:
+                print("adapt layer norms.")
+                for block in model.transformer.h:
+                    for param in block.ln_1.parameters():
+                        param.requires_grad = True
+                    for param in block.ln_2.parameters():
+                        param.requires_grad = True
+                for param in model.transformer.ln_f.parameters():
+                    param.requires_grad = True
+            if variant["adapt_attn"]:
+                print("adapt attention.")
+                for block in model.transformer.h:
+                    for param in block.attn.parameters():
+                        param.requires_grad = True
+            if variant["adapt_ff"]:
+                print("adapt feed-forward.")
+                for block in model.transformer.h:
+                    for param in block.mlp.parameters():
+                        param.requires_grad = True
+            if variant["only_adapt_last_two_blocks"]:
+                print("for transformer, only adapt the last two blocks.")
+                for block in model.transformer.h[0:-2]:
+                    for param in block.parameters():
+                        param.requires_grad = False
+            if variant["adapt_last_two_blocks"]:
+                print("for transformer, adapt the last two blocks.")
+                for block in model.transformer.h[-2:]:
+                    for param in block.parameters():
+                        param.requires_grad = True
+        else:
+            print("fintune all.")
     elif model_type == "bc":
         model = MLPBCModel(
             state_dim=state_dim,
@@ -295,6 +361,22 @@ def experiment(
             device = device,
             num_class=variant["num_class"]
         )
+    elif model_type == "reinformer":
+        env_name = train_env_name_list[0]
+        trainer = ReinSequenceTrainer(
+            args=variant,
+            model=model,
+            optimizer=optimizer,
+            batch_size=batch_size,
+            get_batch=get_batch(trajectories_list[0], info[env_name], variant),
+            scheduler=scheduler,
+            loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a) ** 2),
+            eval_fns=None,
+            get_prompt=get_prompt(prompt_trajectories_list[0], info[env_name], variant),
+            get_prompt_batch=get_prompt_batch(trajectories_list, prompt_trajectories_list, info, variant, train_env_name_list),
+            device=device,
+            num_class=variant["num_class"],
+        )
     elif model_type == "bc":
         env_name = train_env_name_list[0]
         trainer = ActTrainer(
@@ -307,6 +389,8 @@ def experiment(
             loss_fn=lambda s_hat, a_hat, r_hat, s, a, r: torch.mean((a_hat - a) ** 2),
             eval_fns=None,
         )
+    else:
+        raise NotImplementedError
     if not variant['evaluation']:
         if log_to_wandb:
             wandb_api_key = os.environ.get('WANDB_API_KEY')
@@ -314,8 +398,7 @@ def experiment(
             wandb.init(
                 name=exp_prefix,
                 group=group_name,
-                # NOTE: fill in the name of your own wandb project
-                project='LPDT_v2_dataset_compute',
+                project='LPDT',
                 config=variant,
             )
         save_path += wandb.run.name
@@ -514,5 +597,7 @@ if __name__ == "__main__":
     parser.add_argument("--infoNCE", action="store_true", default=False)
     parser.add_argument("--infoNCE_lambda", type=float, default=0.1)
     parser.add_argument("--temperature", type=float, default=1)
+    parser.add_argument("--reconstruction", action="store_true", default=False)
+    parser.add_argument("--reconstruction_lambda", type=float, default=0.1)
     args = parser.parse_args()
     experiment("d4rl-experiment", variant=vars(args))
