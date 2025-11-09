@@ -1,4 +1,5 @@
 # Pre-trained Language Models Improve the Few-shot Prompt Ability of Decision Transformer
+### <p align="center">[TMLR 2025]</p>
 <p align="center">
   <a href="https://yangyu0879.github.io/">Yu Yang</a> ·
   <a href="https://panxulab.github.io/">Pan Xu</a>
