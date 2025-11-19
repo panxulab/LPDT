@@ -92,14 +92,14 @@ python experiment.py \
 ## Citation
 ```
 @article{
-yang2025pretrained,
-title={Pre-trained Language Models Improve the Few-shot  Prompt Ability of Decision Transformer},
-author={Yu Yang and Pan Xu},
-journal={Transactions on Machine Learning Research},
-issn={2835-8856},
-year={2025},
-url={https://openreview.net/forum?id=k520i3XEMK},
-note={}
+  yang2025pretrained,
+  title={Pre-trained Language Models Improve the Few-shot  Prompt Ability of Decision Transformer},
+  author={Yu Yang and Pan Xu},
+  journal={Transactions on Machine Learning Research},
+  issn={2835-8856},
+  year={2025},
+  url={https://openreview.net/forum?id=k520i3XEMK},
+  note={}
 }
 ```
 
